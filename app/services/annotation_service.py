@@ -10,7 +10,7 @@ from app.domain.models import ExpertCorrectedBox
 
 _INITIAL_CATEGORIES = FasterRCNN_ResNet50_FPN_V2_Weights.DEFAULT.meta["categories"]
 _INITIAL_LABEL_TO_ID = {
-    name: idx for idx, name in enumerate(_INITIAL_CATEGORIES) if name not in (None, "__background__")
+    name: idx for idx, name in enumerate(_INITIAL_CATEGORIES) if name not in (None, "__background__", "N/A")
 }
 
 
