@@ -32,3 +32,7 @@ async def save_annotations(
     payload = AnnotationPayload.model_validate_json(annotations)
     annotation_service.save(image_bytes, image.filename, payload.detections)
     return {"status": "success"}
+
+@router.get("/health")
+async def health():
+    return ""
