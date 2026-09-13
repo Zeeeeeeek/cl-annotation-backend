@@ -7,7 +7,7 @@ from app.services.detection_service import DetectionService
 from fastapi.middleware.cors import CORSMiddleware
 import os
 import uvicorn
-
+# rule test
 app = FastAPI()
 
 origins = os.environ.get("CORS_ORIGINS", "http://localhost:5173").split(",")
