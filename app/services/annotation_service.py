@@ -41,7 +41,7 @@ class AnnotationService:
         })
 
         for offset, box in enumerate(boxes):
-            category_id = self._get_or_create_category_id(data["categories"], box.label)
+            category_id = self._get_or_create_category_id(data["categories"], box.label.strip().lower())
             data["annotations"].append({
                 "id": next_annotation_id + offset,
                 "image_id": image_id,
