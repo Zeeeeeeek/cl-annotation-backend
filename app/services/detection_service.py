@@ -8,3 +8,6 @@ class DetectionService:
 
     def detection(self, image_bytes: bytes) -> list[DetectedBox]:
         return self.detector.detect(image_bytes)
+
+    def get_learned_categories(self) -> list[str]:
+        return self.detector.get_categories()

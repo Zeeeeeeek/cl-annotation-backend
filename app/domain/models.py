@@ -17,3 +17,7 @@ class ExpertCorrectedBox(BaseModel):
 
 class AnnotationPayload(BaseModel):
     detections: list[ExpertCorrectedBox]
+
+class ClassInfo(BaseModel):
+    name: str
+    learned: bool

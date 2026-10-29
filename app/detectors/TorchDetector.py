@@ -27,6 +27,9 @@ class TorchDetector:
         self._model.to(self._device)
         self._model.eval()
 
+    def get_categories(self) -> list[str]:
+        return [name for name in self._categories if name not in ("__background__", "N/A")]
+
     def detect(self, image_bytes: bytes) -> list[DetectedBox]:
         image = Image.open(io.BytesIO(image_bytes)).convert("RGB")
         input_tensor = self._transform(image).to(self._device)

@@ -53,6 +53,9 @@ class AnnotationService:
 
         self._save(data)
 
+    def get_categories(self) -> list[str]:
+        return [category["name"] for category in self._load()["categories"]]
+
     @staticmethod
     def _get_or_create_category_id(categories: list[dict], label: str) -> int:
         for category in categories:

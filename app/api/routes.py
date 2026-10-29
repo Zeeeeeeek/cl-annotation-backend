@@ -1,6 +1,6 @@
 from fastapi import APIRouter, UploadFile, Depends, Form, HTTPException
 
-from app.domain.models import DetectedBox, AnnotationPayload
+from app.domain.models import DetectedBox, AnnotationPayload, ClassInfo
 from app.services.annotation_service import AnnotationService
 from app.services.detection_service import DetectionService
 
@@ -32,6 +32,14 @@ async def save_annotations(
     payload = AnnotationPayload.model_validate_json(annotations)
     annotation_service.save(image_bytes, image.filename, payload.detections)
     return {"status": "success"}
+
+@router.get("/classes")
+async def get_classes(
+    annotation_service: AnnotationService = Depends(get_annotations_service),
+    detection_service: DetectionService = Depends(get_detection_service),
+) -> list[ClassInfo]:
+    learned = set(detection_service.get_learned_categories())
+    return [ClassInfo(name=name, learned=name in learned) for name in annotation_service.get_categories()]
 
 @router.get("/health")
 async def health():
