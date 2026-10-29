@@ -6,12 +6,15 @@ from PIL import Image, ImageOps
 from torchvision.models.detection import FasterRCNN_ResNet50_FPN_V2_Weights
 
 from app.config import ANNOTATIONS_FILE, IMAGES_DIR
+from app.domain.errors import InvalidImageError, InvalidAnnotationError
 from app.domain.models import ExpertCorrectedBox
 
 _INITIAL_CATEGORIES = FasterRCNN_ResNet50_FPN_V2_Weights.DEFAULT.meta["categories"]
 _INITIAL_LABEL_TO_ID = {
     name: idx for idx, name in enumerate(_INITIAL_CATEGORIES) if name not in (None, "__background__", "N/A")
 }
+
+BOX_TOLERANCE = 0.01
 
 
 class AnnotationService:
@@ -24,11 +27,20 @@ class AnnotationService:
     def save(self, image_bytes: bytes, file_name: str, boxes: list[ExpertCorrectedBox]) -> None:
         data = self._load()
 
-        original = Image.open(io.BytesIO(image_bytes))
-        image_format = original.format
-        needs_rotation = original.getexif().get(274, 1) != 1
-        image = ImageOps.exif_transpose(original)
+        try:
+            original = Image.open(io.BytesIO(image_bytes))
+            image_format = original.format
+            needs_rotation = original.getexif().get(274, 1) != 1
+            image = ImageOps.exif_transpose(original)
+        except OSError as error:
+            raise InvalidImageError("File is not a supported image") from error
         width, height = image.size
+
+        for index, box in enumerate(boxes):
+            right = box.box.x + box.box.width
+            bottom = box.box.y + box.box.height
+            if right > width + BOX_TOLERANCE or bottom > height + BOX_TOLERANCE:
+                raise InvalidAnnotationError(f"Box {index} is outside the image ({width}x{height})")
 
         image_id = self._next_id(data["images"])
         next_annotation_id = self._next_id(data["annotations"])
@@ -48,7 +60,7 @@ class AnnotationService:
         })
 
         for offset, box in enumerate(boxes):
-            category_id = self._get_or_create_category_id(data["categories"], box.label.strip().lower())
+            category_id = self._get_or_create_category_id(data["categories"], box.label)
             data["annotations"].append({
                 "id": next_annotation_id + offset,
                 "image_id": image_id,

@@ -1,4 +1,6 @@
 from fastapi import APIRouter, UploadFile, Depends, Form, HTTPException
+from fastapi.exceptions import RequestValidationError
+from pydantic import ValidationError
 
 from app.domain.models import DetectedBox, AnnotationPayload, ClassInfo
 from app.services.annotation_service import AnnotationService
@@ -29,7 +31,10 @@ async def save_annotations(
     if image.filename is None:
         raise HTTPException(status_code=400, detail="Image file is required.")
     image_bytes = await image.read()
-    payload = AnnotationPayload.model_validate_json(annotations)
+    try:
+        payload = AnnotationPayload.model_validate_json(annotations)
+    except ValidationError as error:
+        raise RequestValidationError(error.errors())
     annotation_service.save(image_bytes, image.filename, payload.detections)
     return {"status": "success"}
 

@@ -1,6 +1,8 @@
 import torch
 import io
 from torchvision.models.detection import fasterrcnn_resnet50_fpn_v2, FasterRCNN_ResNet50_FPN_V2_Weights
+
+from app.domain.errors import InvalidImageError
 from app.domain.models import DetectedBox, BoundingBox
 from PIL import Image, ImageOps
 
@@ -31,7 +33,10 @@ class TorchDetector:
         return [name for name in self._categories if name not in ("__background__", "N/A")]
 
     def detect(self, image_bytes: bytes) -> list[DetectedBox]:
-        image = ImageOps.exif_transpose(Image.open(io.BytesIO(image_bytes))).convert("RGB")
+        try:
+            image = ImageOps.exif_transpose(Image.open(io.BytesIO(image_bytes))).convert("RGB")
+        except OSError as error:
+            raise InvalidImageError("File is not a supported image") from error
         input_tensor = self._transform(image).to(self._device)
 
         with torch.no_grad():

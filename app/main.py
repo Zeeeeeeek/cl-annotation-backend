@@ -1,7 +1,9 @@
-from fastapi import FastAPI
+from fastapi import FastAPI, Request
+from fastapi.responses import JSONResponse
 
 from app.api.routes import router, get_detection_service, get_annotations_service
 from app.detectors.TorchDetector import TorchDetector
+from app.domain.errors import InvalidImageError, InvalidInputError
 from app.services.annotation_service import AnnotationService
 from app.services.detection_service import DetectionService
 from fastapi.middleware.cors import CORSMiddleware
@@ -19,6 +21,10 @@ app.add_middleware(
     allow_methods=["GET", "POST"],
     allow_headers=["Content-Type"]
 )
+
+@app.exception_handler(InvalidInputError)
+async def handle_invalid_input(_request: Request, error: InvalidInputError):
+    return JSONResponse(status_code=422, content={"detail": str(error)})
 
 detector = TorchDetector(device="cuda")
 detection_service = DetectionService(detector)
