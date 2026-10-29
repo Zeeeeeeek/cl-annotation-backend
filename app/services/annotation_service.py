@@ -2,7 +2,7 @@ import io
 import json
 from pathlib import Path
 
-from PIL import Image
+from PIL import Image, ImageOps
 from torchvision.models.detection import FasterRCNN_ResNet50_FPN_V2_Weights
 
 from app.config import ANNOTATIONS_FILE, IMAGES_DIR
@@ -24,14 +24,21 @@ class AnnotationService:
     def save(self, image_bytes: bytes, file_name: str, boxes: list[ExpertCorrectedBox]) -> None:
         data = self._load()
 
-        image = Image.open(io.BytesIO(image_bytes))
+        original = Image.open(io.BytesIO(image_bytes))
+        image_format = original.format
+        needs_rotation = original.getexif().get(274, 1) != 1
+        image = ImageOps.exif_transpose(original)
         width, height = image.size
 
         image_id = self._next_id(data["images"])
         next_annotation_id = self._next_id(data["annotations"])
 
         stored_file_name = f"{image_id}_{file_name}"
-        (self._images_dir / stored_file_name).write_bytes(image_bytes)
+        image_path = self._images_dir / stored_file_name
+        if needs_rotation:
+            image.save(image_path, format=image_format, quality=95)
+        else:
+            image_path.write_bytes(image_bytes)
 
         data["images"].append({
             "id": image_id,

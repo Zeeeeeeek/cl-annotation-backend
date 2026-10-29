@@ -2,7 +2,7 @@ import torch
 import io
 from torchvision.models.detection import fasterrcnn_resnet50_fpn_v2, FasterRCNN_ResNet50_FPN_V2_Weights
 from app.domain.models import DetectedBox, BoundingBox
-from PIL import Image
+from PIL import Image, ImageOps
 
 
 class TorchDetector:
@@ -31,7 +31,7 @@ class TorchDetector:
         return [name for name in self._categories if name not in ("__background__", "N/A")]
 
     def detect(self, image_bytes: bytes) -> list[DetectedBox]:
-        image = Image.open(io.BytesIO(image_bytes)).convert("RGB")
+        image = ImageOps.exif_transpose(Image.open(io.BytesIO(image_bytes))).convert("RGB")
         input_tensor = self._transform(image).to(self._device)
 
         with torch.no_grad():
