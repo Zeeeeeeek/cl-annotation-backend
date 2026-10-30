@@ -2,21 +2,19 @@ from fastapi import FastAPI, Request
 from fastapi.responses import JSONResponse
 
 from app.api.routes import router, get_detection_service, get_annotations_service
+from app.config import CORS_ORIGINS, PORT, DEVICE, CONFIDENCE_THRESHOLD
 from app.detectors.TorchDetector import TorchDetector
-from app.domain.errors import InvalidImageError, InvalidInputError
+from app.domain.errors import  InvalidInputError
 from app.services.annotation_service import AnnotationService
 from app.services.detection_service import DetectionService
 from fastapi.middleware.cors import CORSMiddleware
-import os
 import uvicorn
 
 app = FastAPI()
 
-origins = os.environ.get("CORS_ORIGINS", "http://localhost:5173").split(",")
-
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=origins,
+    allow_origins=CORS_ORIGINS,
     allow_credentials=True,
     allow_methods=["GET", "POST"],
     allow_headers=["Content-Type"]
@@ -26,7 +24,7 @@ app.add_middleware(
 async def handle_invalid_input(_request: Request, error: InvalidInputError):
     return JSONResponse(status_code=422, content={"detail": str(error)})
 
-detector = TorchDetector(device="cuda")
+detector = TorchDetector(device=DEVICE, confidence_threshold=CONFIDENCE_THRESHOLD)
 detection_service = DetectionService(detector)
 annotation_service = AnnotationService()
 
@@ -36,4 +34,4 @@ app.dependency_overrides[get_annotations_service] = lambda: annotation_service
 app.include_router(router)
 
 if __name__ == "__main__":
-    uvicorn.run(app, host="0.0.0.0", port=int(os.environ.get("PORT", 8080)))
+    uvicorn.run(app, host="0.0.0.0", port=PORT)
