@@ -2,9 +2,11 @@ from fastapi import FastAPI, Request
 from fastapi.responses import JSONResponse
 
 from app.api.routes import router, get_detection_service, get_annotations_service
-from app.config import CORS_ORIGINS, PORT, DEVICE, CONFIDENCE_THRESHOLD
+from app.config import CORS_ORIGINS, PORT, DEVICE, CONFIDENCE_THRESHOLD, DATABASE_PATH
+from app.database import create_db_engine
 from app.detectors.TorchDetector import TorchDetector
 from app.domain.errors import  InvalidInputError
+from app.repositories.annotation_repository import AnnotationRepository
 from app.services.annotation_service import AnnotationService
 from app.services.detection_service import DetectionService
 from fastapi.middleware.cors import CORSMiddleware
@@ -26,7 +28,8 @@ async def handle_invalid_input(_request: Request, error: InvalidInputError):
 
 detector = TorchDetector(device=DEVICE, confidence_threshold=CONFIDENCE_THRESHOLD)
 detection_service = DetectionService(detector)
-annotation_service = AnnotationService()
+engine = create_db_engine(DATABASE_PATH)
+annotation_service = AnnotationService(AnnotationRepository(engine))
 
 app.dependency_overrides[get_detection_service] = lambda: detection_service
 app.dependency_overrides[get_annotations_service] = lambda: annotation_service

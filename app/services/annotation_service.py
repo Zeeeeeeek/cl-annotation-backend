@@ -1,13 +1,13 @@
-import io
-import json
+import hashlib
 from pathlib import Path
-
-from PIL import Image, ImageOps
 from torchvision.models.detection import FasterRCNN_ResNet50_FPN_V2_Weights
 
-from app.config import ANNOTATIONS_FILE, IMAGES_DIR
-from app.domain.errors import InvalidImageError, InvalidAnnotationError
+from app.config import IMAGES_DIR
+from app.database import ImageRecord
+from app.domain.errors import InvalidAnnotationError
 from app.domain.models import ExpertCorrectedBox
+from app.images import open_image, OpenedImage
+from app.repositories.annotation_repository import AnnotationRepository
 
 _INITIAL_CATEGORIES = FasterRCNN_ResNet50_FPN_V2_Weights.DEFAULT.meta["categories"]
 _INITIAL_LABEL_TO_ID = {
@@ -18,90 +18,42 @@ BOX_TOLERANCE = 0.01
 
 
 class AnnotationService:
-    def __init__(self, images_dir: str = IMAGES_DIR, annotations_file: str = ANNOTATIONS_FILE):
+    def __init__(self, repository: AnnotationRepository, images_dir: str = IMAGES_DIR):
+        self._repository = repository
         self._images_dir = Path(images_dir)
-        self._annotations_file = Path(annotations_file)
         self._images_dir.mkdir(parents=True, exist_ok=True)
-        self._annotations_file.parent.mkdir(parents=True, exist_ok=True)
+        self._repository.seed_categories(_INITIAL_LABEL_TO_ID)
 
     def save(self, image_bytes: bytes, file_name: str, boxes: list[ExpertCorrectedBox]) -> None:
-        data = self._load()
+        opened = open_image(image_bytes)
+        width, height = opened.image.size
+        self._check_boxes_inside(boxes, width, height)
 
-        try:
-            original = Image.open(io.BytesIO(image_bytes))
-            image_format = original.format
-            needs_rotation = original.getexif().get(274, 1) != 1
-            image = ImageOps.exif_transpose(original)
-        except OSError as error:
-            raise InvalidImageError("File is not a supported image") from error
-        width, height = image.size
+        sha256 = hashlib.sha256(image_bytes).hexdigest()
+        stored_file_name = f"{sha256}{Path(file_name).suffix.lower()}"
+        self._store_file(stored_file_name, image_bytes, opened)
 
+        self._repository.replace_image_annotations(
+            ImageRecord(sha256=sha256, file_name=stored_file_name, original_name=file_name, width=width, height=height),
+            boxes,
+        )
+
+    def get_categories(self) -> list[str]:
+        return self._repository.get_category_names()
+
+    @staticmethod
+    def _check_boxes_inside(boxes: list[ExpertCorrectedBox], width: int, height: int) -> None:
         for index, box in enumerate(boxes):
             right = box.box.x + box.box.width
             bottom = box.box.y + box.box.height
             if right > width + BOX_TOLERANCE or bottom > height + BOX_TOLERANCE:
                 raise InvalidAnnotationError(f"Box {index} is outside the image ({width}x{height})")
 
-        image_id = self._next_id(data["images"])
-        next_annotation_id = self._next_id(data["annotations"])
-
-        stored_file_name = f"{image_id}_{file_name}"
+    def _store_file(self, stored_file_name: str, image_bytes: bytes, opened: OpenedImage) -> None:
         image_path = self._images_dir / stored_file_name
-        if needs_rotation:
-            image.save(image_path, format=image_format, quality=95)
+        if image_path.exists():
+            return
+        if opened.was_rotated:
+            opened.image.save(image_path, format=opened.format, quality=95)
         else:
             image_path.write_bytes(image_bytes)
-
-        data["images"].append({
-            "id": image_id,
-            "file_name": stored_file_name,
-            "width": width,
-            "height": height,
-        })
-
-        for offset, box in enumerate(boxes):
-            category_id = self._get_or_create_category_id(data["categories"], box.label)
-            data["annotations"].append({
-                "id": next_annotation_id + offset,
-                "image_id": image_id,
-                "category_id": category_id,
-                "bbox": [box.box.x, box.box.y, box.box.width, box.box.height],
-                "area": box.box.width * box.box.height,
-                "iscrowd": 0,
-            })
-
-        self._save(data)
-
-    def get_categories(self) -> list[str]:
-        return [category["name"] for category in self._load()["categories"]]
-
-    @staticmethod
-    def _get_or_create_category_id(categories: list[dict], label: str) -> int:
-        for category in categories:
-            if category["name"] == label:
-                return category["id"]
-
-        new_id = max((c["id"] for c in categories), default=-1) + 1
-        categories.append({"id": new_id, "name": label})
-        return new_id
-
-    def _load(self) -> dict:
-        if not self._annotations_file.exists():
-            return {
-                "images": [],
-                "annotations": [],
-                "categories": [
-                    {"id": category_id, "name": name}
-                    for name, category_id in _INITIAL_LABEL_TO_ID.items()
-                ],
-            }
-        return json.loads(self._annotations_file.read_text())
-
-    def _save(self, data: dict) -> None:
-        self._annotations_file.write_text(json.dumps(data, indent=2))
-
-    @staticmethod
-    def _next_id(items: list[dict]) -> int:
-        if not items:
-            return 1
-        return max(item["id"] for item in items) + 1

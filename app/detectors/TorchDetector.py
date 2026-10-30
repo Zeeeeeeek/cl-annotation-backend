@@ -6,6 +6,8 @@ from app.domain.errors import InvalidImageError
 from app.domain.models import DetectedBox, BoundingBox
 from PIL import Image, ImageOps
 
+from app.images import open_image
+
 
 class TorchDetector:
     def __init__(
@@ -33,10 +35,7 @@ class TorchDetector:
         return [name for name in self._categories if name not in ("__background__", "N/A")]
 
     def detect(self, image_bytes: bytes) -> list[DetectedBox]:
-        try:
-            image = ImageOps.exif_transpose(Image.open(io.BytesIO(image_bytes))).convert("RGB")
-        except OSError as error:
-            raise InvalidImageError("File is not a supported image") from error
+        image = open_image(image_bytes).image.convert("RGB")
         input_tensor = self._transform(image).to(self._device)
 
         with torch.no_grad():
