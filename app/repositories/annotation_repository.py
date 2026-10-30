@@ -1,9 +1,16 @@
+from dataclasses import dataclass
+
 from sqlalchemy import delete
 from sqlmodel import Session, select
 
 from app.database import Annotation, Category, ImageRecord, utc_now
 from app.domain.models import ExpertCorrectedBox
 
+@dataclass
+class Dataset:
+    images: list[ImageRecord]
+    annotations: list[Annotation]
+    categories: list[Category]
 
 class AnnotationRepository:
     def __init__(self, engine):
@@ -43,6 +50,13 @@ class AnnotationRepository:
                     height=box.box.height,
                 ))
             session.commit()
+
+    def get_dataset(self) -> Dataset:
+        with Session(self._engine) as session:
+            images = list(session.exec(select(ImageRecord).order_by(ImageRecord.id)).all())
+            annotations = list(session.exec(select(Annotation).order_by(Annotation.id)).all())
+            categories = list(session.exec(select(Category).order_by(Category.id)).all())
+        return Dataset(images, annotations, categories)
 
     @staticmethod
     def _get_or_create_category_id(session: Session, label: str) -> int:
