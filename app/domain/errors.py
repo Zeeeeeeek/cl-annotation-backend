@@ -9,3 +9,7 @@ class InvalidImageError(InvalidInputError):
 class InvalidAnnotationError(InvalidInputError):
     """Raised when the annotation data is invalid or cannot be processed."""
     pass
+
+class InvalidModelError(InvalidInputError):
+    """Raised when the model weights or categories cannot be loaded."""
+    pass

@@ -1,8 +1,11 @@
-from fastapi import APIRouter, UploadFile, Depends, Form, HTTPException
+from secrets import compare_digest
+
+from fastapi import APIRouter, UploadFile, Depends, Form, HTTPException, Header
 from fastapi.exceptions import RequestValidationError
 from pydantic import ValidationError
 
-from app.domain.models import DetectedBox, AnnotationPayload, ClassInfo
+from app.config import MODEL_HOT_UPDATE_SECRET
+from app.domain.models import DetectedBox, AnnotationPayload, ClassInfo, ModelUpdatePayload
 from app.services.annotation_service import AnnotationService
 from app.services.detection_service import DetectionService
 
@@ -49,3 +52,15 @@ async def get_classes(
 @router.get("/health")
 async def health():
     return ""
+
+def require_model_update_secret(x_model_secret: str | None = Header(default=None)) -> None:
+    if (
+        MODEL_HOT_UPDATE_SECRET is None
+        or x_model_secret is None
+        or not compare_digest(MODEL_HOT_UPDATE_SECRET, x_model_secret)
+    ):
+        raise HTTPException(status_code=403, detail="Invalid or missing model update secret.")
+
+@router.put("/model", dependencies=[Depends(require_model_update_secret)])
+async def model_hot_update(payload: ModelUpdatePayload) -> None:
+    pass

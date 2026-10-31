@@ -3,7 +3,7 @@ from pathlib import Path
 
 from app.config import IMAGES_DIR
 from app.database import ImageRecord
-from app.domain.errors import InvalidAnnotationError
+from app.domain.errors import InvalidAnnotationError, InvalidModelError
 from app.domain.models import ExpertCorrectedBox
 from app.images import open_image, OpenedImage
 from app.repositories.annotation_repository import AnnotationRepository
@@ -16,10 +16,10 @@ def _check_categories_match(model_categories: dict[int, str], db_categories: dic
     db_ids_by_name = {name: category_id for category_id, name in db_categories.items()}
     for category_id, name in model_categories.items():
         if category_id in db_categories and db_categories[category_id] != name:
-            raise ValueError(
+            raise InvalidModelError(
                 f"Category id {category_id} is '{name}' in the model but '{db_categories[category_id]}' in the database")
         if name in db_ids_by_name and db_ids_by_name[name] != category_id:
-            raise ValueError(
+            raise InvalidModelError(
                 f"Category '{name}' has id {category_id} in the model but {db_ids_by_name[name]} in the database")
 
 class AnnotationService:

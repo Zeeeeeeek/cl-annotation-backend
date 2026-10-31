@@ -1,6 +1,7 @@
 import torch
 from torchvision.models.detection import fasterrcnn_resnet50_fpn_v2, FasterRCNN_ResNet50_FPN_V2_Weights
 
+from app.domain.errors import InvalidModelError
 from app.domain.models import DetectedBox, BoundingBox
 
 from app.images import open_image
@@ -36,7 +37,11 @@ class TorchDetector:
             self._categories = _to_index_list(categories)
             self._model = fasterrcnn_resnet50_fpn_v2(weights=None, weights_backbone=None,
                                                      num_classes=len(self._categories))
-            self._model.load_state_dict(torch.load(weights_path, map_location=self._device, weights_only=True))
+            try:
+                state_dict = torch.load(weights_path, map_location=self._device, weights_only=True)
+                self._model.load_state_dict(state_dict)
+            except Exception as error:
+                raise InvalidModelError(f"Cannot load weights from {weights_path}: {error!r}") from error
 
         self._model.to(self._device)
         self._model.eval()

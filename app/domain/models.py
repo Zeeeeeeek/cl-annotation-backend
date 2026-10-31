@@ -24,3 +24,12 @@ class AnnotationPayload(BaseModel):
 class ClassInfo(BaseModel):
     name: str
     learned: bool
+
+class CategoryInfo(BaseModel):
+    id: int = Field(gt=0)
+    name: str = Field(min_length=1, max_length=100)
+
+class ModelUpdatePayload(BaseModel):
+    weights_path: str = Field(min_length=1)
+    categories: list[CategoryInfo] = Field(min_length=1)
+    trained_image_ids: list[int]
