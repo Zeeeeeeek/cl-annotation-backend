@@ -29,6 +29,11 @@ class AnnotationRepository:
             categories = session.exec(select(Category).order_by(Category.id)).all()
             return [category.name for category in categories]
 
+    def get_categories_by_id(self) -> dict[int, str]:
+        with Session(self._engine) as session:
+            categories = session.exec(select(Category)).all()
+            return {category.id: category.name for category in categories if category.id is not None}
+
     def replace_image_annotations(self, image: ImageRecord, boxes: list[ExpertCorrectedBox]) -> None:
         with Session(self._engine) as session:
             stored = session.exec(select(ImageRecord).where(ImageRecord.sha256 == image.sha256)).first()

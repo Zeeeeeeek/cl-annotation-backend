@@ -11,12 +11,24 @@ from app.repositories.annotation_repository import AnnotationRepository
 
 BOX_TOLERANCE = 0.01
 
+
+def _check_categories_match(model_categories: dict[int, str], db_categories: dict[int, str]) -> None:
+    db_ids_by_name = {name: category_id for category_id, name in db_categories.items()}
+    for category_id, name in model_categories.items():
+        if category_id in db_categories and db_categories[category_id] != name:
+            raise ValueError(
+                f"Category id {category_id} is '{name}' in the model but '{db_categories[category_id]}' in the database")
+        if name in db_ids_by_name and db_ids_by_name[name] != category_id:
+            raise ValueError(
+                f"Category '{name}' has id {category_id} in the model but {db_ids_by_name[name]} in the database")
+
 class AnnotationService:
     def __init__(self, repository: AnnotationRepository, initial_categories: dict[int, str],
                  images_dir: str = IMAGES_DIR):
         self._repository = repository
         self._images_dir = Path(images_dir)
         self._images_dir.mkdir(parents=True, exist_ok=True)
+        _check_categories_match(initial_categories, self._repository.get_categories_by_id())
         self._repository.seed_categories(initial_categories)
 
     def save(self, image_bytes: bytes, file_name: str, boxes: list[ExpertCorrectedBox]) -> None:
