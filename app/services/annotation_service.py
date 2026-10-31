@@ -1,6 +1,5 @@
 import hashlib
 from pathlib import Path
-from torchvision.models.detection import FasterRCNN_ResNet50_FPN_V2_Weights
 
 from app.config import IMAGES_DIR
 from app.database import ImageRecord
@@ -9,20 +8,16 @@ from app.domain.models import ExpertCorrectedBox
 from app.images import open_image, OpenedImage
 from app.repositories.annotation_repository import AnnotationRepository
 
-_INITIAL_CATEGORIES = FasterRCNN_ResNet50_FPN_V2_Weights.DEFAULT.meta["categories"]
-_INITIAL_LABEL_TO_ID = {
-    name: idx for idx, name in enumerate(_INITIAL_CATEGORIES) if name not in (None, "__background__", "N/A")
-}
 
 BOX_TOLERANCE = 0.01
 
-
 class AnnotationService:
-    def __init__(self, repository: AnnotationRepository, images_dir: str = IMAGES_DIR):
+    def __init__(self, repository: AnnotationRepository, initial_categories: dict[int, str],
+                 images_dir: str = IMAGES_DIR):
         self._repository = repository
         self._images_dir = Path(images_dir)
         self._images_dir.mkdir(parents=True, exist_ok=True)
-        self._repository.seed_categories(_INITIAL_LABEL_TO_ID)
+        self._repository.seed_categories(initial_categories)
 
     def save(self, image_bytes: bytes, file_name: str, boxes: list[ExpertCorrectedBox]) -> None:
         opened = open_image(image_bytes)

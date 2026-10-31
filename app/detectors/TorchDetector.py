@@ -1,10 +1,7 @@
 import torch
-import io
 from torchvision.models.detection import fasterrcnn_resnet50_fpn_v2, FasterRCNN_ResNet50_FPN_V2_Weights
 
-from app.domain.errors import InvalidImageError
 from app.domain.models import DetectedBox, BoundingBox
-from PIL import Image, ImageOps
 
 from app.images import open_image
 
@@ -73,3 +70,10 @@ class TorchDetector:
                 )
             )
         return detected_boxes
+
+    def get_categories_and_ids(self)-> dict[int, str]:
+        return {
+            category_id: category_name
+            for category_id, category_name in enumerate(self._categories)
+            if category_name not in ("__background__", "N/A")
+        }

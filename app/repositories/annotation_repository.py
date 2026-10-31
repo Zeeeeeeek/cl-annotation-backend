@@ -16,10 +16,10 @@ class AnnotationRepository:
     def __init__(self, engine):
         self._engine = engine
 
-    def seed_categories(self, categories: dict[str, int]) -> None:
+    def seed_categories(self, categories: dict[int, str]) -> None:
         with Session(self._engine) as session:
             existing_ids = set(session.exec(select(Category.id)).all())
-            for name, category_id in categories.items():
+            for category_id, name in categories.items():
                 if category_id not in existing_ids:
                     session.add(Category(id=category_id, name=name))
             session.commit()

@@ -40,7 +40,7 @@ else:
 
 detection_service = DetectionService(detector)
 engine = create_db_engine(DATABASE_PATH)
-annotation_service = AnnotationService(AnnotationRepository(engine))
+annotation_service = AnnotationService(AnnotationRepository(engine), initial_categories=detector.get_categories_and_ids())
 
 app.dependency_overrides[get_detection_service] = lambda: detection_service
 app.dependency_overrides[get_annotations_service] = lambda: annotation_service
