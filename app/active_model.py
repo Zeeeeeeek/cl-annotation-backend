@@ -20,3 +20,11 @@ def load_active_model_from_json(json_path: str) -> ActiveModel | None:
         raise FileNotFoundError(f"Active model weights file not found: {weights_path}")
     categories = {category["id"]: category["name"] for category in data["categories"]}
     return ActiveModel(weights_path=weights_path, categories=categories)
+
+
+def save_active_model_to_json(json_path: str, active_model: ActiveModel) -> None:
+    data = {
+        "weights_path": active_model.weights_path,
+        "categories": [{"id": category_id, "name": name} for category_id, name in active_model.categories.items()],
+    }
+    Path(json_path).write_text(json.dumps(data, indent=2))
