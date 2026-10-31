@@ -1,7 +1,7 @@
 from dataclasses import dataclass
 
 from sqlalchemy import delete
-from sqlmodel import Session, select
+from sqlmodel import Session, select, col
 
 from app.database import Annotation, Category, ImageRecord, utc_now
 from app.domain.models import ExpertCorrectedBox
@@ -62,6 +62,15 @@ class AnnotationRepository:
             annotations = list(session.exec(select(Annotation).order_by(Annotation.id)).all())
             categories = list(session.exec(select(Category).order_by(Category.id)).all())
         return Dataset(images, annotations, categories)
+
+    def delete_images(self, image_ids: list[int]) -> list[str]:
+        with Session(self._engine) as session:
+            images = session.exec(select(ImageRecord).where(col(ImageRecord.id).in_(image_ids))).all()
+            file_names = [image.file_name for image in images]
+            for image in images:
+                session.delete(image)
+            session.commit()
+        return file_names
 
     @staticmethod
     def _get_or_create_category_id(session: Session, label: str) -> int:

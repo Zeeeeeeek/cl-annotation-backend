@@ -48,6 +48,11 @@ class AnnotationService:
     def get_categories(self) -> list[str]:
         return self._repository.get_category_names()
 
+    def delete_images(self, image_ids: list[int]) -> None:
+        file_names = self._repository.delete_images(image_ids)
+        for file_name in file_names:
+            (self._images_dir / file_name).unlink(missing_ok=True)
+
     @staticmethod
     def _check_boxes_inside(boxes: list[ExpertCorrectedBox], width: int, height: int) -> None:
         for index, box in enumerate(boxes):
