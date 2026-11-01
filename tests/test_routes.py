@@ -7,10 +7,10 @@ from PIL import Image
 
 from app.api import routes
 from app.api.web_app import create_web_app
-from app.database import create_db_engine
+from app.repositories.database import create_db_engine
 from app.domain.errors import InvalidModelError
 from app.domain.models import DetectedBox, BoundingBox
-from app.images import open_image
+from app.domain.images import open_image
 from app.repositories.annotation_repository import AnnotationRepository
 from app.services.annotation_service import AnnotationService
 from app.services.detection_service import DetectionService

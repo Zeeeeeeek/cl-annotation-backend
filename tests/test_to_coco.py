@@ -1,5 +1,5 @@
-from app.database import Annotation, Category, ImageRecord
-from app.export_coco import to_coco
+from app.repositories.database import Annotation, Category, ImageRecord
+from app.scripts.export_coco import to_coco
 from app.repositories.annotation_repository import Dataset
 
 

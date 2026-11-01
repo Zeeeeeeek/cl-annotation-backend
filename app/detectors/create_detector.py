@@ -1,4 +1,4 @@
-from app.active_model import ActiveModel
+from app.repositories.active_model import ActiveModel
 from app.config import CONFIDENCE_THRESHOLD, DEVICE
 from app.detectors.TorchDetector import TorchDetector
 

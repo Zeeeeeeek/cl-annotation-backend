@@ -1,6 +1,6 @@
 import pytest
 
-from app.database import ImageRecord, create_db_engine
+from app.repositories.database import ImageRecord, create_db_engine
 from app.domain.models import BoundingBox, ExpertCorrectedBox
 from app.repositories.annotation_repository import AnnotationRepository
 

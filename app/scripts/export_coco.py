@@ -3,7 +3,7 @@ from argparse import ArgumentParser
 from pathlib import Path
 
 from app.config import DATABASE_PATH, IMAGES_DIR
-from app.database import create_db_engine
+from app.repositories.database import create_db_engine
 from app.repositories.annotation_repository import Dataset, AnnotationRepository
 
 

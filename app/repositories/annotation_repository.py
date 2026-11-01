@@ -3,7 +3,7 @@ from dataclasses import dataclass
 from sqlalchemy import delete
 from sqlmodel import Session, select, col
 
-from app.database import Annotation, Category, ImageRecord, utc_now
+from app.repositories.database import Annotation, Category, ImageRecord, utc_now
 from app.domain.models import ExpertCorrectedBox
 
 @dataclass

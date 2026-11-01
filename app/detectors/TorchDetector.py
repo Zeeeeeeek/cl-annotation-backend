@@ -4,7 +4,7 @@ from torchvision.models.detection import fasterrcnn_resnet50_fpn_v2, FasterRCNN_
 from app.domain.errors import InvalidModelError
 from app.domain.models import DetectedBox, BoundingBox
 
-from app.images import open_image
+from app.domain.images import open_image
 
 
 def _to_index_list(categories: dict[int, str]) -> list[str]:

@@ -2,10 +2,10 @@ import hashlib
 from pathlib import Path
 
 from app.config import IMAGES_DIR
-from app.database import ImageRecord
+from app.repositories.database import ImageRecord
 from app.domain.errors import InvalidAnnotationError, InvalidModelError
 from app.domain.models import ExpertCorrectedBox
-from app.images import open_image, OpenedImage
+from app.domain.images import open_image, OpenedImage
 from app.repositories.annotation_repository import AnnotationRepository
 
 

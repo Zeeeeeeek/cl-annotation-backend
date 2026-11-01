@@ -2,10 +2,10 @@ import logging
 
 from fastapi import FastAPI
 
-from app.active_model import load_active_model_from_json
+from app.repositories.active_model import load_active_model_from_json
 from app.api.web_app import create_web_app
 from app.config import PORT, DATABASE_PATH, ACTIVE_MODEL_PATH
-from app.database import create_db_engine
+from app.repositories.database import create_db_engine
 from app.detectors.create_detector import create_detector
 from app.repositories.annotation_repository import AnnotationRepository
 from app.services.annotation_service import AnnotationService

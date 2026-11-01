@@ -2,7 +2,7 @@ import json
 
 import pytest
 
-from app.active_model import ActiveModel, load_active_model_from_json, save_active_model_to_json
+from app.repositories.active_model import ActiveModel, load_active_model_from_json, save_active_model_to_json
 
 
 def test_should_return_none_when_file_does_not_exist(tmp_path):

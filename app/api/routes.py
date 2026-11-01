@@ -4,7 +4,7 @@ from fastapi import APIRouter, UploadFile, Depends, Form, HTTPException, Header
 from fastapi.exceptions import RequestValidationError
 from pydantic import ValidationError
 
-from app.active_model import save_active_model_to_json, ActiveModel
+from app.repositories.active_model import save_active_model_to_json, ActiveModel
 from app.config import MODEL_HOT_UPDATE_SECRET, ACTIVE_MODEL_PATH
 from app.detectors.create_detector import create_detector
 from app.domain.models import DetectedBox, AnnotationPayload, ClassInfo, ModelUpdatePayload

@@ -4,7 +4,7 @@ import io
 import pytest
 from PIL import Image
 
-from app.database import create_db_engine
+from app.repositories.database import create_db_engine
 from app.domain.errors import InvalidAnnotationError, InvalidImageError, InvalidModelError
 from app.domain.models import BoundingBox, ExpertCorrectedBox
 from app.repositories.annotation_repository import AnnotationRepository

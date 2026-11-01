@@ -4,7 +4,7 @@ import pytest
 from PIL import Image
 
 from app.domain.errors import InvalidImageError
-from app.images import open_image
+from app.domain.images import open_image
 
 EXIF_ORIENTATION_TAG = 274
 
