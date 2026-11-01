@@ -5,8 +5,8 @@ from fastapi.exceptions import RequestValidationError
 from pydantic import ValidationError
 
 from app.active_model import save_active_model_to_json, ActiveModel
-from app.config import MODEL_HOT_UPDATE_SECRET, CONFIDENCE_THRESHOLD, DEVICE, ACTIVE_MODEL_PATH
-from app.detectors.TorchDetector import TorchDetector
+from app.config import MODEL_HOT_UPDATE_SECRET, ACTIVE_MODEL_PATH
+from app.detectors.create_detector import create_detector
 from app.domain.models import DetectedBox, AnnotationPayload, ClassInfo, ModelUpdatePayload
 from app.services.annotation_service import AnnotationService
 from app.services.detection_service import DetectionService
@@ -78,14 +78,10 @@ def model_hot_update(
         annotation_service: AnnotationService = Depends(get_annotations_service),
 ) -> dict:
     categories = {category.id: category.name for category in payload.categories}
-    detector = TorchDetector(
-        weights_path=payload.weights_path,
-        categories=categories,
-        device=DEVICE,
-        confidence_threshold=CONFIDENCE_THRESHOLD,
-    )
+    active_model = ActiveModel(weights_path=payload.weights_path, categories=categories)
+    detector = create_detector(active_model)
     annotation_service.register_model_categories(categories)
-    save_active_model_to_json(ACTIVE_MODEL_PATH, ActiveModel(weights_path=payload.weights_path, categories=categories))
+    save_active_model_to_json(ACTIVE_MODEL_PATH, active_model)
     detection_service.replace_detector(detector)
     annotation_service.delete_images(payload.trained_image_ids)
     return {"status": "success"}

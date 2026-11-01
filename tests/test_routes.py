@@ -2,15 +2,14 @@ import io
 import json
 
 import pytest
-from fastapi import FastAPI, Request
-from fastapi.responses import JSONResponse
 from fastapi.testclient import TestClient
 from PIL import Image
 
 from app.api import routes
+from app.api.web_app import create_web_app
 from app.database import create_db_engine
-from app.domain.errors import InvalidInputError, InvalidModelError
-from app.domain.models import BoundingBox, DetectedBox
+from app.domain.errors import InvalidModelError
+from app.domain.models import DetectedBox, BoundingBox
 from app.images import open_image
 from app.repositories.annotation_repository import AnnotationRepository
 from app.services.annotation_service import AnnotationService
@@ -20,11 +19,12 @@ SECRET = "test-secret"
 
 
 class FakeDetector:
-    def __init__(self, weights_path=None, categories=None, **_kwargs):
-        self.weights_path = weights_path
-        self.categories = categories or {1: "person"}
+    def __init__(self, active_model=None):
+        self.weights_path = active_model.weights_path if active_model else None
+        self.categories = active_model.categories if active_model else {1: "person"}
 
-    def detect(self, image_bytes):
+    @staticmethod
+    def detect(image_bytes):
         open_image(image_bytes)
         return [DetectedBox(box=BoundingBox(x=1, y=2, width=3, height=4), label="person", confidence=0.9)]
 
@@ -33,8 +33,8 @@ class FakeDetector:
 
 
 class FailingDetector:
-    def __init__(self, weights_path=None, **_kwargs):
-        raise InvalidModelError(f"Cannot load weights from {weights_path}")
+    def __init__(self, active_model):
+        raise InvalidModelError(f"Cannot load weights from {active_model.weights_path}")
 
 
 def make_jpeg(width=40, height=20):
@@ -78,22 +78,13 @@ def active_model_path(tmp_path, monkeypatch):
     path = tmp_path / "active_model.json"
     monkeypatch.setattr(routes, "ACTIVE_MODEL_PATH", str(path))
     monkeypatch.setattr(routes, "MODEL_HOT_UPDATE_SECRET", SECRET)
-    monkeypatch.setattr(routes, "TorchDetector", FakeDetector)
+    monkeypatch.setattr(routes, "create_detector", FakeDetector)
     return path
 
 
 @pytest.fixture
 def client(annotation_service, detection_service):
-    app = FastAPI()
-
-    @app.exception_handler(InvalidInputError)
-    async def handle_invalid_input(_request: Request, error: InvalidInputError):
-        return JSONResponse(status_code=422, content={"detail": str(error)})
-
-    app.dependency_overrides[routes.get_detection_service] = lambda: detection_service
-    app.dependency_overrides[routes.get_annotations_service] = lambda: annotation_service
-    app.include_router(routes.router)
-    return TestClient(app)
+    return TestClient(create_web_app(detection_service, annotation_service))
 
 
 def post_annotations(client, image_bytes, annotations):
@@ -233,7 +224,7 @@ def test_should_change_nothing_when_model_categories_conflict_with_database(
 
 def test_should_change_nothing_when_weights_cannot_be_loaded(
         client, active_model_path, detection_service, annotation_service, monkeypatch):
-    monkeypatch.setattr(routes, "TorchDetector", FailingDetector)
+    monkeypatch.setattr(routes, "create_detector", FailingDetector)
 
     response = client.put("/model", json=model_payload(), headers={"X-Model-Secret": SECRET})
 
