@@ -28,8 +28,7 @@ class AnnotationService:
         self._repository = repository
         self._images_dir = Path(images_dir)
         self._images_dir.mkdir(parents=True, exist_ok=True)
-        _check_categories_match(initial_categories, self._repository.get_categories_by_id())
-        self._repository.seed_categories(initial_categories)
+        self.register_model_categories(initial_categories)
 
     def save(self, image_bytes: bytes, file_name: str, boxes: list[ExpertCorrectedBox]) -> None:
         opened = open_image(image_bytes)
@@ -47,6 +46,10 @@ class AnnotationService:
 
     def get_categories(self) -> list[str]:
         return self._repository.get_category_names()
+
+    def register_model_categories(self, model_categories: dict[int, str]) -> None:
+        _check_categories_match(model_categories, self._repository.get_categories_by_id())
+        self._repository.seed_categories(model_categories)
 
     def delete_images(self, image_ids: list[int]) -> None:
         file_names = self._repository.delete_images(image_ids)

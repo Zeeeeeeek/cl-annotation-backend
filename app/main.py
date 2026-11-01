@@ -38,6 +38,8 @@ else:
         confidence_threshold=CONFIDENCE_THRESHOLD
     )
 
+print(f"Loaded model: {active_model.weights_path if active_model else 'default torchvision weights'}")
+
 detection_service = DetectionService(detector)
 engine = create_db_engine(DATABASE_PATH)
 annotation_service = AnnotationService(AnnotationRepository(engine), initial_categories=detector.get_categories_and_ids())
