@@ -1,34 +1,56 @@
 import torch
-import io
 from torchvision.models.detection import fasterrcnn_resnet50_fpn_v2, FasterRCNN_ResNet50_FPN_V2_Weights
+
+from app.domain.errors import InvalidModelError
 from app.domain.models import DetectedBox, BoundingBox
-from PIL import Image
+
+from app.images import open_image
+
+
+def _to_index_list(categories: dict[int, str]) -> list[str]:
+    names = ["N/A"] * (max(categories) + 1)
+    names[0] = "__background__"
+    for category_id, name in categories.items():
+        names[category_id] = name
+    return names
 
 
 class TorchDetector:
     def __init__(
-        self,
-        weights_path: str | None = None,
-        confidence_threshold: float = 0.5,
-        device: str = "cpu",
+            self,
+            weights_path: str | None = None,
+            categories: dict[int, str] | None = None,
+            confidence_threshold: float = 0.5,
+            device: str = "cpu",
     ):
-        weights = FasterRCNN_ResNet50_FPN_V2_Weights.DEFAULT
-        self._categories = weights.meta["categories"]
-        self._transform = weights.transforms()
+        default_weights = FasterRCNN_ResNet50_FPN_V2_Weights.DEFAULT
+        self._transform = default_weights.transforms()
         self._confidence_threshold = confidence_threshold
         self._device = torch.device(device)
 
         if weights_path is None:
-            self._model = fasterrcnn_resnet50_fpn_v2(weights=weights)
+            self._categories = default_weights.meta["categories"]
+            self._model = fasterrcnn_resnet50_fpn_v2(weights=default_weights)
         else:
-            self._model = fasterrcnn_resnet50_fpn_v2(weights=None)
-            self._model.load_state_dict(torch.load(weights_path, map_location=self._device))
+            if categories is None:
+                raise ValueError("categories are required when loading custom weights")
+            self._categories = _to_index_list(categories)
+            self._model = fasterrcnn_resnet50_fpn_v2(weights=None, weights_backbone=None,
+                                                     num_classes=len(self._categories))
+            try:
+                state_dict = torch.load(weights_path, map_location=self._device, weights_only=True)
+                self._model.load_state_dict(state_dict)
+            except Exception as error:
+                raise InvalidModelError(f"Cannot load weights from {weights_path}: {error!r}") from error
 
         self._model.to(self._device)
         self._model.eval()
 
+    def get_categories(self) -> list[str]:
+        return [name for name in self._categories if name not in ("__background__", "N/A")]
+
     def detect(self, image_bytes: bytes) -> list[DetectedBox]:
-        image = Image.open(io.BytesIO(image_bytes)).convert("RGB")
+        image = open_image(image_bytes).image.convert("RGB")
         input_tensor = self._transform(image).to(self._device)
 
         with torch.no_grad():
@@ -53,3 +75,10 @@ class TorchDetector:
                 )
             )
         return detected_boxes
+
+    def get_categories_and_ids(self)-> dict[int, str]:
+        return {
+            category_id: category_name
+            for category_id, category_name in enumerate(self._categories)
+            if category_name not in ("__background__", "N/A")
+        }

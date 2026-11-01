@@ -1,85 +1,74 @@
-import io
-import json
+import hashlib
 from pathlib import Path
 
-from PIL import Image
-from torchvision.models.detection import FasterRCNN_ResNet50_FPN_V2_Weights
-
-from app.config import ANNOTATIONS_FILE, IMAGES_DIR
+from app.config import IMAGES_DIR
+from app.database import ImageRecord
+from app.domain.errors import InvalidAnnotationError, InvalidModelError
 from app.domain.models import ExpertCorrectedBox
+from app.images import open_image, OpenedImage
+from app.repositories.annotation_repository import AnnotationRepository
 
-_INITIAL_CATEGORIES = FasterRCNN_ResNet50_FPN_V2_Weights.DEFAULT.meta["categories"]
-_INITIAL_LABEL_TO_ID = {
-    name: idx for idx, name in enumerate(_INITIAL_CATEGORIES) if name not in (None, "__background__", "N/A")
-}
 
+BOX_TOLERANCE = 0.01
+
+
+def _check_categories_match(model_categories: dict[int, str], db_categories: dict[int, str]) -> None:
+    db_ids_by_name = {name: category_id for category_id, name in db_categories.items()}
+    for category_id, name in model_categories.items():
+        if category_id in db_categories and db_categories[category_id] != name:
+            raise InvalidModelError(
+                f"Category id {category_id} is '{name}' in the model but '{db_categories[category_id]}' in the database")
+        if name in db_ids_by_name and db_ids_by_name[name] != category_id:
+            raise InvalidModelError(
+                f"Category '{name}' has id {category_id} in the model but {db_ids_by_name[name]} in the database")
 
 class AnnotationService:
-    def __init__(self, images_dir: str = IMAGES_DIR, annotations_file: str = ANNOTATIONS_FILE):
+    def __init__(self, repository: AnnotationRepository, initial_categories: dict[int, str],
+                 images_dir: str = IMAGES_DIR):
+        self._repository = repository
         self._images_dir = Path(images_dir)
-        self._annotations_file = Path(annotations_file)
         self._images_dir.mkdir(parents=True, exist_ok=True)
-        self._annotations_file.parent.mkdir(parents=True, exist_ok=True)
+        self.register_model_categories(initial_categories)
 
     def save(self, image_bytes: bytes, file_name: str, boxes: list[ExpertCorrectedBox]) -> None:
-        data = self._load()
+        opened = open_image(image_bytes)
+        width, height = opened.image.size
+        self._check_boxes_inside(boxes, width, height)
 
-        image = Image.open(io.BytesIO(image_bytes))
-        width, height = image.size
+        sha256 = hashlib.sha256(image_bytes).hexdigest()
+        stored_file_name = f"{sha256}{Path(file_name).suffix.lower()}"
+        self._store_file(stored_file_name, image_bytes, opened)
 
-        image_id = self._next_id(data["images"])
-        next_annotation_id = self._next_id(data["annotations"])
+        self._repository.replace_image_annotations(
+            ImageRecord(sha256=sha256, file_name=stored_file_name, original_name=file_name, width=width, height=height),
+            boxes,
+        )
 
-        stored_file_name = f"{image_id}_{file_name}"
-        (self._images_dir / stored_file_name).write_bytes(image_bytes)
+    def get_categories(self) -> list[str]:
+        return self._repository.get_category_names()
 
-        data["images"].append({
-            "id": image_id,
-            "file_name": stored_file_name,
-            "width": width,
-            "height": height,
-        })
+    def register_model_categories(self, model_categories: dict[int, str]) -> None:
+        _check_categories_match(model_categories, self._repository.get_categories_by_id())
+        self._repository.seed_categories(model_categories)
 
-        for offset, box in enumerate(boxes):
-            category_id = self._get_or_create_category_id(data["categories"], box.label)
-            data["annotations"].append({
-                "id": next_annotation_id + offset,
-                "image_id": image_id,
-                "category_id": category_id,
-                "bbox": [box.box.x, box.box.y, box.box.width, box.box.height],
-                "area": box.box.width * box.box.height,
-                "iscrowd": 0,
-            })
-
-        self._save(data)
+    def delete_images(self, image_ids: list[int]) -> None:
+        file_names = self._repository.delete_images(image_ids)
+        for file_name in file_names:
+            (self._images_dir / file_name).unlink(missing_ok=True)
 
     @staticmethod
-    def _get_or_create_category_id(categories: list[dict], label: str) -> int:
-        for category in categories:
-            if category["name"] == label:
-                return category["id"]
+    def _check_boxes_inside(boxes: list[ExpertCorrectedBox], width: int, height: int) -> None:
+        for index, box in enumerate(boxes):
+            right = box.box.x + box.box.width
+            bottom = box.box.y + box.box.height
+            if right > width + BOX_TOLERANCE or bottom > height + BOX_TOLERANCE:
+                raise InvalidAnnotationError(f"Box {index} is outside the image ({width}x{height})")
 
-        new_id = max((c["id"] for c in categories), default=-1) + 1
-        categories.append({"id": new_id, "name": label})
-        return new_id
-
-    def _load(self) -> dict:
-        if not self._annotations_file.exists():
-            return {
-                "images": [],
-                "annotations": [],
-                "categories": [
-                    {"id": category_id, "name": name}
-                    for name, category_id in _INITIAL_LABEL_TO_ID.items()
-                ],
-            }
-        return json.loads(self._annotations_file.read_text())
-
-    def _save(self, data: dict) -> None:
-        self._annotations_file.write_text(json.dumps(data, indent=2))
-
-    @staticmethod
-    def _next_id(items: list[dict]) -> int:
-        if not items:
-            return 1
-        return max(item["id"] for item in items) + 1
+    def _store_file(self, stored_file_name: str, image_bytes: bytes, opened: OpenedImage) -> None:
+        image_path = self._images_dir / stored_file_name
+        if image_path.exists():
+            return
+        if opened.was_rotated:
+            opened.image.save(image_path, format=opened.format, quality=95)
+        else:
+            image_path.write_bytes(image_bytes)
